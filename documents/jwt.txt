@@ -1,0 +1,140 @@
+#
+#	https://jwt.io/introduction/
+#
+
+##	传统bs结构项目，客户端和服务端在一个项目中，服务端将将sessionId作为值存储在键为jsession的cookie键中，实际上这个是servlet容器或者webserver的功能。
+	在分布式、微服务中这种方式是无法做到session同步的，因此分布式项目不能使用session验证；
+	1> 微软以前有做法将session持久化到数据库中，这种思路现在还可以使用，服务端提供token给前端，前端每次请求都携带此token，服务端利用自身算法重新算出token比较，
+		这种方式要求一个第三方服务器提供的服务，当然如果只是为这个小功能也就没有必要搞那么复杂，一个简单瞬间启动的redis就能搞定。
+	2> sso方式有点老旧，而中国银联的sso就是扯淡。
+	3> 更加流弊的分布式方式就是json web token，简称jwt。
+
+##	我们之前通过这种方式处理CORS,在多次使用中是没有问题的。	
+	/**
+	 * @Desc 返回突破同源策略服务端配置
+	 * @return
+	 */
+	private CorsConfiguration buildConfig() {
+		CorsConfiguration corsConfiguration = new CorsConfiguration();
+		corsConfiguration.addAllowedOrigin("*");
+		corsConfiguration.addAllowedHeader("*");
+		corsConfiguration.addAllowedMethod("*");		
+		corsConfiguration.addExposedHeader("x-auth-token");
+		corsConfiguration.addExposedHeader("x-total-count");		
+		return corsConfiguration;
+	}
+	/**
+	 * @desc 在启动类中配置bean允许解决跨域问题,这个是推荐的做法
+	 * @return
+	 */
+	 @Bean
+	 public CorsFilter corsFilter() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", buildConfig());      // 4
+        return new CorsFilter(source);
+	 }
+	 但是在添加web token验证后，在过滤器或者拦截器中就返回json格式数据（当token无效是），请求未能到达目标handler,跨域请求不能起作用，这个时候总是报一个无法跨域cors错误，
+	这个错误非常让人误解，他的意思是说你要设置
+	response.setHeader("Access-Control-Allow-Credentials", "true");
+    response.setHeader("Access-Control-Allow-Methods", "POST, GET, PATCH, DELETE, PUT");
+    response.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept,Access-Token");
+	spring boot CorsConfiguration应该就是做这个的，并且在没有添加web token拦截器或过滤器之前一切都正常。
+	
+	我之前粗暴的将这种我一贯坚持的跨域代码删除删除，重写了一个过滤器，就是CorsFilter,在这个过滤器中处理跨域请求问题，这样拦截器中返回的jsonbean也就通目标handler一样支持跨域啦。
+	这种方式也就是目前项目的方式，我暂时不改啦。
+
+##	实际上如果安装作者原始的方式
+	@Configuration
+	public class WebConfiguration implements WebMvcConfigurer {
+	    private TokenInterceptor tokenInterceptor;
+	    public WebConfiguration(TokenInterceptor tokenInterceptor){
+	        this.tokenInterceptor = tokenInterceptor;
+	    }
+	    @Override
+	    public void addCorsMappings(CorsRegistry registry) {
+	        registry.addMapping("/**")
+	                .allowCredentials(true)
+	                .allowedHeaders("*")
+	                .allowedMethods("*")
+	                .allowedOrigins("*");
+	    }
+	    @Override
+	    public void configureAsyncSupport(AsyncSupportConfigurer configurer){
+	        configurer.setTaskExecutor(new ConcurrentTaskExecutor(Executors.newFixedThreadPool(3)));
+	        configurer.setDefaultTimeout(30000);
+	    }
+	    @Override
+	    public void addInterceptors(InterceptorRegistry registry){
+	        List<String> excludePath = new ArrayList<>();
+	        //排除拦截，除了注册登录(此时还没token)，其他都拦截
+	        excludePath.add("/user/register");  //登录
+	        excludePath.add("/user/login");     //注册
+	        excludePath.add("/static/**");  //静态资源
+	        excludePath.add("/assets/**");  //静态资源
+	 
+	        registry.addInterceptor(tokenInterceptor)
+	                .addPathPatterns("/**")
+	                .excludePathPatterns(excludePath);
+	        WebMvcConfigurer.super.addInterceptors(registry);
+	    }
+	}
+	1> 作者建议cors配置和拦截器配置放到一个文件中，也就是当前文件，这样也不用在App.java中写我之前的那个跨域处理策略，尽管我觉得他目前只能对正常请求起作用，对拦截器、过滤中的json无法返回；
+		这种方式也不需要写CorsFilter。
+		这种方式对于拦截器中的JSONBean返回报跨域错误如何解决决呢？
+	
+	2> 以TokenIntercreptor为例，可以单独处理这里的跨域问题
+		@Component
+		public class TokenInterceptor implements HandlerInterceptor{
+			@Override
+		    public boolean preHandle(HttpServletRequest request, HttpServletResponse response,Object handler)throws Exception{
+		        if(request.getMethod().equals("OPTIONS")){  //针对某些异步请求工具发送两次请求的情况，这一步只是在请求是否支持跨域之类，不包含任何实际请求数据
+		            response.setStatus(HttpServletResponse.SC_OK);
+		            return true;
+		        }
+		        
+		       	 添加如下代码就是2的解决办法，这段代码仅仅对当前filter起作用，个人认为这种方式也蛮好的。       
+		        httpServletResponse.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE");
+		        httpServletResponse.setHeader("Access-Control-Max-Age", "3600");
+		        httpServletResponse.setHeader("Access-Control-Allow-Credentials", "true");
+		        httpServletResponse.setHeader("Access-Control-Allow-Headers", "x-requested-with,X-Nideshop-Token,X-URL-PATH");
+		        httpServletResponse.setHeader("Access-Control-Allow-Origin", httpServletRequest.getHeader("Origin"));
+		        
+		        response.setCharacterEncoding("utf-8");
+		        String token = request.getHeader("Access-Token");
+		        if(token != null){
+		            boolean result = TokenUtil.verify(token);
+		            if(result){
+		                System.out.println("通过拦截器");
+		                return true;
+		            }
+		        }
+		        response.setCharacterEncoding("UTF-8");
+		        response.setContentType("application/json; charset=utf-8");
+		        try{
+		        	ObjectMapper objectMapper = new ObjectMapper();
+		        	String result = objectMapper.writeValueAsString(new JSONBean(false, "验证失败", "401"));
+		        	response.getWriter().append(result);
+		        	System.out.println("认证失败，未通过拦截器");
+		        }catch (Exception e){
+		            e.printStackTrace();
+		            response.sendError(500);
+		            return false;
+		        }
+		        return false;
+		    }
+		}
+	3> 我当前的解决办法是：
+		CorsFilter解决跨域问题，不负责其他内容；
+		WebConfiguration：配置了拦截器，那里目前只添加了一个TokenInterceptor；
+		App.java中也不处理跨域问题，这与我之前的风格不太一样。
+		在理解1、2的基础上，上面三个文件可以做少量合并。		
+		
+			
+	
+	
+	
+	
+		
+
+
+

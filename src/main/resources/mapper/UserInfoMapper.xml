@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="com.hoperun.yuntu_maps.mapper.UserInfoMapper"> 	
+	
+ 	<!-- getUser -->				   
+    <select id="getUser" resultType="com.hoperun.yuntu_maps.entities.UserInfo">
+    	select * from tbl_userinfo WHERE id=#{id} 
+	</select> 
+	
+	<!-- select md5(PASSWORD) from tbl_userinfo WHERE id=4 如果前端传递明文 这里需要使用md5加密 -->
+	<select id="login" resultType="com.hoperun.yuntu_maps.entities.UserInfo">
+		select * from tbl_userinfo where name=#{name} and password=md5(#{password})
+	</select>
+	
+</mapper>

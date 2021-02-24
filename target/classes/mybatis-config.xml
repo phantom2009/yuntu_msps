@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+	<!-- 全局配置文件不是必须的，因为已经与spring整合了,可以配置到spring sqlSessionFactory properties，这个文件也可以不需要，这里跟着老师后面保留一个 -->
+	<!-- 主配置文件配置顺序也有要求不可乱 -->
+	
+	<!-- 下划线命名到驼峰式自动转换：spring boot替代解决方法mybatis.configuration.map-underscore-to-camel-case=true -->
+	<settings>
+		<!-- 启动下划线到驼峰式的自动转换 -->
+		<setting name="mapUnderscoreToCamelCase" value="true"/>
+	</settings>
+	
+	<!-- 实体类批量起别名 -->
+	<typeAliases>
+		<package name="com.hoperun.yuntu_maps.entities"/>
+	</typeAliases>
+	
+	<!-- 配置mapper文件路径 -->	
+</configuration>

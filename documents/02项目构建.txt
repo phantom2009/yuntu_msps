@@ -1,0 +1,12 @@
+#
+#
+#
+
+##	普通maven项目，加一个<parent>就变成spring boot项目，这种方式更加像是老司机的创建方式，有点不再赘述，以后都要这么干。
+	
+##	当前版本构建的quick start maven project没有src/main/resources，可以new - sources 新建一个，新建之后src/main/java、src/main/resources、src/test/jaja
+	这三个文件夹的顺序不太对，可以右键项目->properties->	java build path-> order and export选项卡-> 右侧up | down按钮，通过这个调整文件夹顺序，
+	呵呵，尽管很无聊，当好玩吧，不调整对开发没有影响，只是“程序员的强迫症”。
+	
+	
+	

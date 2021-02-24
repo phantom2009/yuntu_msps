@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+<mapper namespace="com.hoperun.yuntu_maps.mapper.MerchantDefinitionMapper"> 
+	
+	<!-- add -->
+    <insert id="add" parameterType="com.hoperun.yuntu_maps.entities.MerchantDefinition">
+        insert into yuntu_index_merchant_difinition(
+        merchant_name,
+        geo_type,
+        center,   
+        bounds,
+        area,
+        _level,
+        description
+     
+        )
+        values (
+        #{merchantName},
+        #{geoType},
+        #{center},
+        #{bounds},
+        #{area},
+        #{level},
+        #{description}
+
+        )
+    </insert>	
+
+	<!-- 删除 -->
+    <delete id="del" parameterType="Long">
+        delete from yuntu_index_merchant_difinition where id=#{id}
+    </delete>
+
+    
+    <!-- 条件加分组查询 -->
+    <select id="getMerchantDifinitions" resultType="com.hoperun.yuntu_maps.entities.MerchantDefinition">
+        select * from yuntu_index_merchant_difinition
+        <if test="mer.merchantName!=null and mer.merchantName!=''" >
+            where merchant_name like  CONCAT('%',#{mer.merchantName},'%')
+        </if>
+        order by id desc
+        limit #{offset},#{size}
+    </select>
+    <!-- 条件查询总数 -->
+    <select id="getMerchantDifinitionsTotal" resultType="Long">
+        select count(id) from yuntu_index_merchant_difinition
+        <if test="mer.merchantName!=null and mer.merchantName!=''" >
+            where merchant_name like  CONCAT('%',#{mer.merchantName},'%')
+        </if>
+    </select>
+	<!-- 
+		在hibernate、entityFramework等dao层操作是，getMerchantDifinitions我一般都只写一个方法，mybatis一个方法搞不定这个问题
+	 -->
+	
+
+</mapper>
